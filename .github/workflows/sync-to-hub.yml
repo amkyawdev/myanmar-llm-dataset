@@ -9,42 +9,43 @@ on:
       - 'requirements.txt'
 
 jobs:
-  sync-to-hub:
+  sync:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
       
-      - name: Install dependencies
-        run: pip install huggingface_hub
+      - name: Install HF CLI
+        run: pip install huggingface-hub
       
-      - name: Sync to HuggingFace Space
+      - name: Sync to Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: python << 'PYTHON'
+        run: |
+          python << 'PY'
 import os
 from huggingface_hub import HfApi
 
 token = os.environ.get("HF_TOKEN")
-if not token:
-    print("Error: HF_TOKEN not set")
+if not token or len(token) < 10:
+    print(f"Error: Invalid token (length: {len(token) if token else 0})")
     exit(1)
 
 api = HfApi()
 
 with open("README.md", "r", encoding="utf-8") as f:
-    readme_content = f.read()
+    content = f.read()
 
 try:
     api.upload_file(
-        path_or_fileobj=readme_content.encode("utf-8"),
+        path_or_fileobj=content.encode("utf-8"),
         path_in_repo="README.md",
         repo_id="amkyawdev/Amkyaw-Myanmar-LLMV1-Space",
         repo_type="space",
-        commit_message="Sync README from GitHub"
+        token=token,
+        commit_message="Sync from GitHub"
     )
-    print("✅ README synced to Space!")
+    print("✅ Synced README to Space!")
 except Exception as e:
     print(f"Error: {e}")
-PYTHON
+    exit(1)
+PY
