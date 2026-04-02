@@ -1,0 +1,56 @@
+name: Sync Dataset to Hub
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'data/processed/**'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+      
+      - name: Install dependencies
+        run: |
+          pip install datasets huggingface_hub
+      
+      - name: Upload to Hub
+        run: |
+          python << 'EOF'
+          from datasets import load_dataset
+          from huggingface_hub import HfApi, login
+          import os
+          
+          # Get token
+          token = os.environ.get('HF_TOKEN')
+          if not token:
+              print("HF_TOKEN not set, skipping upload")
+              exit(0)
+          
+          login(token=token)
+          api = HfApi()
+          
+          # Load and push dataset
+          ds = load_dataset("./data/processed", split=["train", "validation", "test"])
+          ds.push_to_hub("amkyawdev/myanmar-llm-dataset", token=token)
+          print("Dataset pushed to Hub!")
+          EOF
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+      
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "Update dataset from workflow"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
