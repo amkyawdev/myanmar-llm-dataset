@@ -10,6 +10,4 @@ dist/
 .venv/
 *.log
 .DS_Store
-data/raw/*.json
-data/processed/*.jsonl
-!data/processed/dataset_info.json
+data/raw/
