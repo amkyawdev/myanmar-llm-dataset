@@ -1,3 +1,15 @@
+---
+title: Amkyaw Myanmar LLMV1 Space
+emoji: 🌍
+colorFrom: blue
+colorTo: green
+sdk: gradio
+sdk_version: "4.0.0"
+python_version: "3.11"
+app_file: app.py
+pinned: false
+---
+
 # myanmar-llm-dataset
 
 Myanmar Language Model Instruction Dataset for fine-tuning LLM models.
