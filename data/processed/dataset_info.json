@@ -1,12 +1,12 @@
 {
   "dataset_name": "myanmar-llm-dataset",
   "version": "1.0.0",
-  "description": "Myanmar language SFT dataset for LLM training",
+  "description": "Myanmar language SFT dataset for fine-tuning LLMs",
   "language": "my",
-  "num_train_samples": 5,
-  "num_validation_samples": 5,
-  "num_test_samples": 5,
-  "total_samples": 15,
+  "num_train_samples": 1000,
+  "num_validation_samples": 1000,
+  "num_test_samples": 1000,
+  "total_samples": 3000,
   "license": "MIT",
-  "task": "conversation"
+  "task": "conversation-sft"
 }
