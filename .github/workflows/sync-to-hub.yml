@@ -9,43 +9,134 @@ on:
       - 'requirements.txt'
 
 jobs:
-  sync:
+  sync-to-hub:
     runs-on: ubuntu-latest
+    
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       
-      - name: Install HF CLI
-        run: pip install huggingface-hub
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
       
-      - name: Sync to Space
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install huggingface_hub>=0.20.0 requests
+      
+      - name: Verify files exist
+        run: |
+          echo "Checking required files..."
+          for file in README.md app.py requirements.txt; do
+            if [ -f "$file" ]; then
+              echo "✅ $file exists"
+            else
+              echo "⚠️ $file not found (will skip if not needed)"
+            fi
+          done
+      
+      - name: Sync to HuggingFace Space
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
-        run: |
-          python << 'PY'
+          HF_USERNAME: ${{ secrets.HF_USERNAME || 'amkyawdev' }}
+          SPACE_NAME: ${{ secrets.SPACE_NAME || 'Amkyaw-Myanmar-LLMV1-Space' }}
+        run: python << 'PYTHON'
 import os
-from huggingface_hub import HfApi
+import sys
+from pathlib import Path
+from huggingface_hub import HfApi, Repository, create_repo
+import requests
 
 token = os.environ.get("HF_TOKEN")
-if not token or len(token) < 10:
-    print(f"Error: Invalid token (length: {len(token) if token else 0})")
-    exit(1)
+if not token:
+    print("❌ Error: HF_TOKEN environment variable not set")
+    print("   Please add HF_TOKEN to GitHub Secrets")
+    sys.exit(1)
+
+username = os.environ.get("HF_USERNAME", "amkyawdev")
+space_name = os.environ.get("SPACE_NAME", "Amkyaw-Myanmar-LLMV1-Space")
+repo_id = f"{username}/{space_name}"
+
+print(f"🔗 Target Space: {repo_id}")
+print(f"📁 Files to sync: README.md, app.py, requirements.txt")
 
 api = HfApi()
 
-with open("README.md", "r", encoding="utf-8") as f:
-    content = f.read()
-
+# Ensure space exists
 try:
-    api.upload_file(
-        path_or_fileobj=content.encode("utf-8"),
-        path_in_repo="README.md",
-        repo_id="amkyawdev/Amkyaw-Myanmar-LLMV1-Space",
-        repo_type="space",
-        token=token,
-        commit_message="Sync from GitHub"
-    )
-    print("✅ Synced README to Space!")
-except Exception as e:
-    print(f"Error: {e}")
-    exit(1)
-PY
+    api.space_info(repo_id=repo_id)
+    print(f"✅ Space '{repo_id}' exists")
+except Exception:
+    print(f"⚠️ Space '{repo_id}' not found, attempting to create...")
+    try:
+        create_repo(
+            repo_id=repo_id,
+            token=token,
+            repo_type="space",
+            space_sdk="gradio",
+            exist_ok=True
+        )
+        print(f"✅ Created Space '{repo_id}'")
+    except Exception as e:
+        print(f"❌ Failed to create space: {e}")
+        sys.exit(1)
+
+# Files to upload
+files_to_upload = {
+    "README.md": "README.md",
+    "app.py": "app.py", 
+    "requirements.txt": "requirements.txt"
+}
+
+uploaded_count = 0
+failed_files = []
+
+for local_file, remote_path in files_to_upload.items():
+    if not Path(local_file).exists():
+        print(f"⚠️ Skipping {local_file} (file not found)")
+        continue
+    
+    try:
+        with open(local_file, "r", encoding="utf-8") as f:
+            content = f.read()
+        
+        api.upload_file(
+            path_or_fileobj=content.encode("utf-8"),
+            path_in_repo=remote_path,
+            repo_id=repo_id,
+            repo_type="space",
+            token=token,
+            commit_message=f"Sync {local_file} from GitHub (via Actions)"
+        )
+        print(f"✅ Uploaded: {local_file} → {remote_path}")
+        uploaded_count += 1
+    except Exception as e:
+        print(f"❌ Failed to upload {local_file}: {str(e)}")
+        failed_files.append(local_file)
+
+# Summary
+print("\n" + "="*50)
+print("📊 SYNC SUMMARY")
+print("="*50)
+print(f"✅ Successfully uploaded: {uploaded_count} file(s)")
+if failed_files:
+    print(f"❌ Failed: {', '.join(failed_files)}")
+else:
+    print("🎉 All files synced successfully!")
+    
+if uploaded_count > 0:
+    print(f"\n🔗 View your Space: https://huggingface.co/spaces/{repo_id}")
+PYTHON
+      
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Sync failed! Please check the logs above."
+          echo "Common issues:"
+          echo "  - Missing HF_TOKEN secret in GitHub repository settings"
+          echo "  - Incorrect Space name or permissions"
+          echo "  - Network connectivity issues"
