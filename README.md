@@ -1,5 +1,9 @@
 # Myanmar LLM Dataset
 
+<p align="center">
+  <img src="logo.svg" width="120" height="120" alt="Logo"/>
+</p>
+
 မြန်မာဘာသာစကား Large Language Model အတွက် SFT ဒေတာအစုအပါ
 
 ## ဒေတာပါဝင်မှု
