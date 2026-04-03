@@ -15,10 +15,10 @@ https://colab.research.google.com/
 
 import os
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments
 from peft import LoraConfig, get_peft_model, TaskType
 from datasets import load_dataset
-from trl import SFTTrainer, TrainingArguments
+from trl import SFTTrainer
 
 # --- CONFIGURATION ---
 MODEL_NAME = "URajinda/ShweYon-V3-Base"
