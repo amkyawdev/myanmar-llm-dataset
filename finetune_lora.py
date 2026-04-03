@@ -23,7 +23,8 @@ from trl import SFTTrainer, TrainingArguments
 # --- CONFIGURATION ---
 MODEL_NAME = "URajinda/ShweYon-V3-Base"
 OUTPUT_DIR = "./lora_shweyon_myanmar"
-DATASET_PATH = "./data/processed"
+# Load dataset from GitHub repo
+DATASET_REPO = "amkyawdev/myanmar-llm-dataset"
 
 # LoRA Configuration
 LORA_R = 16
@@ -69,12 +70,8 @@ if tokenizer.pad_token is None:
 print("✅ Model loaded successfully!")
 
 # --- LOAD DATASET ---
-print("\n📂 Loading Dataset...")
-dataset = load_dataset("json", data_files={
-    "train": f"{DATASET_PATH}/train.jsonl",
-    "validation": f"{DATASET_PATH}/validation.jsonl",
-    "test": f"{DATASET_PATH}/test.jsonl"
-})
+print("\n📂 Loading Dataset from HuggingFace Hub...")
+dataset = load_dataset(DATASET_REPO)
 
 print(f"✅ Train samples: {len(dataset['train'])}")
 print(f"✅ Validation samples: {len(dataset['validation'])}")
@@ -123,6 +120,25 @@ training_args = TrainingArguments(
 
 # --- TRAINER ---
 print("\n🏋️ Starting Training...")
+
+# Format dataset for SFT - convert messages to text
+def format_messages(example):
+    """Convert messages format to text for SFT"""
+    text = ""
+    for msg in example["messages"]:
+        role = msg["role"]
+        content = msg["content"]
+        if role == "system":
+            text += f"System: {content}\n"
+        elif role == "user":
+            text += f"User: {content}\n"
+        elif role == "assistant":
+            text += f"Assistant: {content}<|endoftext|>\n"
+    return {"text": text}
+
+# Apply formatting
+dataset = dataset.map(format_messages, remove_columns=["messages"])
+
 trainer = SFTTrainer(
     model=model,
     args=training_args,

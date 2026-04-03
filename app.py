@@ -6,6 +6,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 # --- CONFIGURATION ---
 # Using ShweYon-V3-Base - Base model for Myanmar language
 MODEL_NAME = "URajinda/ShweYon-V3-Base"
+DATASET_REPO = "amkyawdev/myanmar-llm-dataset"
 
 # System Prompt - Instructions for the AI assistant
 SYSTEM_PROMPT = """သင်သည် မြန်မာစကားပြောတဲ့ AI စာရေးပါ။ မြန်မာလို ပြောပါ။
@@ -38,157 +39,77 @@ except Exception as e:
 
 def chat_function(message, chat_history=None):
     """
-    Chat function using ShweYon-V3-Base with Chat Template
+    Chat function using ShweYon-V3-Base
     """
     if chat_history is None:
         chat_history = []
     
-    # Build messages with system prompt
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    # Simple formatted prompt - FORCE Myanmar language
+    context = """သင်သည် မြန်မာစကားပြောတဲ့ AI စာရေးပါ။ မြန်မာလို ပြောပါ။ အင်္ဂလိုင်းမလုပ်ပါ။
+ မေးခွန်း:"""
+
+    # Build conversation history - only keep last 2 turns to stay in context
+    recent_history = chat_history[-4:] if len(chat_history) > 4 else chat_history
+    for user_msg, bot_msg in recent_history:
+        context += f"\nသုံးစွဲသူ: {user_msg}\nAI: {bot_msg}"
     
-    # Add conversation history
-    for user_msg, bot_msg in chat_history:
-        messages.append({"role": "user", "content": user_msg})
-        messages.append({"role": "assistant", "content": bot_msg})
-    
-    # Add current message
-    messages.append({"role": "user", "content": message})
-    
-    # Apply ShweYon's chat template
-    try:
-        prompt = tokenizer.apply_chat_template(
-            messages, 
-            tokenize=False, 
-            add_generation_prompt=True
-        )
-    except Exception as e:
-        # Fallback to manual template if chat template fails
-        prompt = f"<s>[INST] {SYSTEM_PROMPT}\n\n{message} [/INST]"
-    
-    # Tokenize
-    inputs = tokenizer(prompt, return_tensors="pt")
+    context += f"\nသုံးစွဲသူ: {message}\nAI:"
+
+    # Tokenize with truncation
+    inputs = tokenizer(context, return_tensors="pt", truncation=True, max_length=512)
     input_ids_len = inputs.input_ids.shape[1]
     
-    # Generate response
+    # Generate with strict parameters to prevent repetition
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
-            max_new_tokens=512,  # Increased for better responses
-            temperature=0.7,     # Balanced creativity
-            top_p=0.9,
-            top_k=50,
+            max_new_tokens=128,
+            temperature=0.3,
+            top_p=0.7,
+            top_k=20,
             do_sample=True,
-            repetition_penalty=1.1,  # Reduce repetition
+            repetition_penalty=1.5,  # Higher to prevent repeating
+            length_penalty=1.2,    # Penalize long responses
+            no_repeat_ngram_size=3, # Prevent 3-gram repetition
             pad_token_id=tokenizer.pad_token_id,
             eos_token_id=tokenizer.eos_token_id
         )
     
-    # Extract only the new tokens (response)
+    # Extract response
     answer_tokens = outputs[0][input_ids_len:]
     decoded_output = tokenizer.decode(answer_tokens, skip_special_tokens=True)
     
-    # Clean up response
-    clean_answer = (
-        decoded_output
-        .replace("[SEP]", "")
-        .replace("[PREDICTION]", "")
-        .replace("[OUT]", "")
-        .replace("</s>", "")
-        .replace("<s>", "")
-        .replace("<|endoftext|>", "")
-        .strip()
-    )
+    # Clean up - extract first line and remove labels
+    lines = decoded_output.split('\n')
+    clean_answer = lines[0].strip() if lines else decoded_output.strip()
+    clean_answer = clean_answer.replace("AI:", "").replace("Assistant:", "").replace("သုံးစွဲသူ:", "").strip()
     
-    # Fallback response if empty
-    if not clean_answer:
-        clean_answer = "နားမလည်ပါဘူးခင်ဗျာ။ တစ်မျိုးပြန်မေးကြည့်ပေးပါ။"
+    # Ensure it's in Myanmar script
+    if clean_answer and not any('\u1000' <= c <= '\u109F' or '\uAA60' <= c <= '\uAA7F' for c in clean_answer[:10] if c):
+        clean_answer = "မေးခွန်းရိုက်ပါ။"
+    
+    if not clean_answer or len(clean_answer) < 2:
+        clean_answer = "ပါးလွှတ်ပါပါ။"
     
     return clean_answer
 
 # --- GRADIO UI ---
 with gr.Blocks(
     title="Amkyaw AI V2 - Myanmar Chatbot",
-    theme=gr.themes.Soft(
-        primary_color="#FFD700",  # Myanmar gold
-        secondary_color="#FFEA00",
-    )
 ) as demo:
     
-    gr.Markdown("""
-    # 🇲🇲 Amkyaw AI V2
-    ### မြန်မာစကားပြောတဲ့ AI Chatbot
+    gr.Markdown("# 🇲🇲 Amkyaw AI V2 - မြန်မာစကားပြောတဲ့ AI Chatbot")
     
-    ---
-    💡 မြန်မာလို မေးခွန်းရိုက်ပါ။
-    """)
-    
-    with gr.Row():
-        with gr.Column(scale=3):
-            chatbot = gr.Chatbot(
-                label="Chat History / စကားမှတ်ပါ", 
-                height=500,
-                show_copy_button=True,
-            )
-        
-        with gr.Column(scale=1):
-            gr.Markdown("### ⚙️ Settings")
-            temperature = gr.Slider(
-                minimum=0.1,
-                maximum=1.0,
-                value=0.7,
-                step=0.1,
-                label="Temperature",
-            )
-            max_tokens = gr.Slider(
-                minimum=64,
-                maximum=1024,
-                value=512,
-                step=64,
-                label="Max Tokens",
-            )
-    
-    with gr.Row():
-        msg = gr.Textbox(
-            placeholder="မေးခွန်းရိုက်ပါ... (Type your question)",
-            container=False,
-            scale=4,
-            label="Message / မေးခွန်း",
-        )
-    
-    with gr.Row():
-        send_btn = gr.Button("📤 ပါးလွှတ်ပါ (Send)", variant="primary")
-        clear_btn = gr.Button("🗑️ ရှင်းပါ (Clear)", variant="secondary")
-    
-    # Chat functions
-    def respond(message, chat_history, temp, max_t):
+    chatbot = gr.Chatbot(label="Chat History / စကားမှတ်ပါ", height=500)
+    msg = gr.Textbox(placeholder="မေးခွန်းရိုက်ပါ...", container=False, scale=4)
+
+    def respond(message, chat_history):
         bot_message = chat_function(message, chat_history)
         chat_history.append((message, bot_message))
         return "", chat_history
-    
-    def clear_chat():
-        return []
-    
-    # Event handlers
-    msg.submit(respond, [msg, chatbot, temperature, max_tokens], [msg, chatbot])
-    send_btn.click(respond, [msg, chatbot, temperature, max_tokens], [msg, chatbot])
-    clear_btn.click(clear_chat, [], [chatbot])
-    
-    gr.Markdown("""
-    ---
-    ### 📝 Model Info
-    - **Model:** ShweYon-V3-Base (URajinda)
-    - **Fine-tuning:** Myanmar Chat Dataset
-    - **Version:** V2
-    
-    ### 💡 Tips
-    - မြန်မာလို မေးပါ။
-    - ရှေ့သမိုင်းကို မှတ်ပါပါ။
-    - ပါဝင်ပါတရား ဖြစ်ပါ။
-    """)
+
+    msg.submit(respond, [msg, chatbot], [msg, chatbot])
+    gr.Button("Send", variant="primary").click(respond, [msg, chatbot], [msg, chatbot])
 
 if __name__ == "__main__":
-    demo.launch(
-        server_name="0.0.0.0",
-        server_port=7860,
-        share=True
-    )
+    demo.launch()

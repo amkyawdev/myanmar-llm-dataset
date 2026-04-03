@@ -1,0 +1,19 @@
+# Myanmar Chat SFT Dataset Configuration
+# Dataset for Fine-tuning ShweYon-V3-Base
+
+dataset_info:
+  name: myanmar-chat-sft
+  description: Myanmar chat dataset for SFT training
+  license: apache-2.0
+  
+splits:
+  train: train.jsonl
+  validation: validation.jsonl
+  test: test.jsonl
+  
+fieldNames:
+  messages: messages
+  
+task_types:
+  - conversational
+  - question_answering
