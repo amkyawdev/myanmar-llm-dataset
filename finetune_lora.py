@@ -42,7 +42,7 @@ WARMUP_RATIO = 0.1
 
 print("🚀 Starting LoRA Fine-tuning for ShweYon-V3-Base...")
 print(f"📁 Model: {MODEL_NAME}")
-print(f"📁 Dataset: {DATASET_PATH}")
+print(f"📁 Dataset: {DATASET_REPO}")
 
 # Check GPU
 if not torch.cuda.is_available():
