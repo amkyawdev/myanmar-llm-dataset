@@ -21,8 +21,8 @@ from datasets import load_dataset
 from trl import SFTTrainer
 
 # --- CONFIGURATION ---
-# Mistral 7B - powerful chat model for Myanmar
-MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
+# Qwen2-0.5B - lightweight model for Myanmar chat
+MODEL_NAME = "Qwen/Qwen2-0.5B-Instruct"
 OUTPUT_DIR = "./lora_myanmar_chat"
 # Load dataset from local files (GitHub repo cloned)
 DATASET_PATH = "./data/processed"

@@ -4,8 +4,8 @@ import gradio as gr
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # --- CONFIGURATION ---
-# Mistral 7B - powerful chat model for Myanmar
-MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
+# Qwen2-0.5B - lightweight model for Myanmar chat
+MODEL_NAME = "Qwen/Qwen2-0.5B-Instruct"
 DATASET_REPO = "amkyawdev/myanmar-llm-dataset"
 
 # System Prompt - Instructions for the AI assistant
