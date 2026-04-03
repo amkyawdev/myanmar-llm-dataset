@@ -23,8 +23,8 @@ from trl import SFTTrainer
 # --- CONFIGURATION ---
 MODEL_NAME = "URajinda/ShweYon-V3-Base"
 OUTPUT_DIR = "./lora_shweyon_myanmar"
-# Load dataset from GitHub repo
-DATASET_REPO = "amkyawdev/myanmar-llm-dataset"
+# Load dataset from local files (GitHub repo cloned)
+DATASET_PATH = "./data/processed"
 
 # LoRA Configuration
 LORA_R = 16
@@ -70,8 +70,12 @@ if tokenizer.pad_token is None:
 print("✅ Model loaded successfully!")
 
 # --- LOAD DATASET ---
-print("\n📂 Loading Dataset from HuggingFace Hub...")
-dataset = load_dataset(DATASET_REPO)
+print("\n📂 Loading Dataset from local files...")
+dataset = load_dataset("json", data_files={
+    "train": f"{DATASET_PATH}/train.jsonl",
+    "validation": f"{DATASET_PATH}/validation.jsonl",
+    "test": f"{DATASET_PATH}/test.jsonl"
+})
 
 print(f"✅ Train samples: {len(dataset['train'])}")
 print(f"✅ Validation samples: {len(dataset['validation'])}")
