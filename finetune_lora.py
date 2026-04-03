@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-LoRA Fine-tuning Script for ShweYon-V3-Base with Myanmar Chat Dataset
+LoRA Fine-tuning Script for Qwen/Qwen2-0.5B-Instruct with Myanmar Chat Dataset
 
 ⚠️ REQUIREMENTS:
 - GPU with at least 16GB VRAM
