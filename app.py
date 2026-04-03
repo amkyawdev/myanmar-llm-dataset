@@ -53,19 +53,19 @@ except Exception as e:
     raise
 
 def chat_function(message, chat_history=None):
-    """Chat function using Qwen2-0.5B"""
+    """Chat function using ShweYon-V3-Base"""
     if chat_history is None:
         chat_history = []
     
-    # Qwen2 prompt format - simple and clean
-    context = "သင်သည် မြန်မာစကားပြောတဲ့ AI စာရေးပါ။ မြန်မာလို ပြောပါ။\n\n"
+    # ShweYon prompt format - simple and clean
+    context = "[INST] <<SYS>>\nသင်သည် မြန်မာစကားပြောတဲ့ AI စာရေးပါ။ မြန်မာလို ပြောပါ။\n<</SYS>>\n\n"
     
     # Build conversation history - only keep last 2 turns
     recent_history = chat_history[-4:] if len(chat_history) > 4 else chat_history
     for user_msg, bot_msg in recent_history:
-        context += f"သုံးစွဲသူ: {user_msg}\nAI: {bot_msg}\n"
+        context += f"User: {user_msg}\nBot: {bot_msg}\n"
     
-    context += f"သုံးစွဲသူ: {message}\nAI: "
+    context += f"User: {message}\nBot: [/INST]"
     
     # Tokenize with truncation
     inputs = tokenizer(context, return_tensors="pt", truncation=True, max_length=512)
@@ -94,7 +94,7 @@ def chat_function(message, chat_history=None):
     # Clean up response
     lines = decoded_output.split('\n')
     clean_answer = lines[0].strip() if lines else decoded_output.strip()
-    clean_answer = clean_answer.replace("AI:", "").replace("Assistant:", "").replace("သုံးစွဲသူ:", "").strip()
+    clean_answer = clean_answer.replace("Bot:", "").replace("AI:", "").replace("Assistant:", "").replace("User:", "").replace("[/INST]", "").strip()
     
     # Ensure it's in Myanmar script
     if clean_answer and not any('\u1000' <= c <= '\u109F' or '\uAA60' <= c <= '\uAA7F' for c in clean_answer[:10] if c):
