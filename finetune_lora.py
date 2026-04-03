@@ -149,9 +149,7 @@ trainer = SFTTrainer(
     args=training_args,
     train_dataset=dataset["train"],
     eval_dataset=dataset["validation"],
-    tokenizer=tokenizer,
     max_seq_length=MAX_SEQ_LENGTH,
-    dataset_text_field="text",
 )
 
 # Train
