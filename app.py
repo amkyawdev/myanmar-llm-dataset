@@ -4,8 +4,8 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from datasets import load_dataset
 
 # --- CONFIGURATION ---
-# Using Qwen2-0.5B-Instruct - Base model for Myanmar chat
-MODEL_NAME = "Qwen/Qwen2-0.5B-Instruct"
+# Using ShweYon-V3-Base - Base model for Myanmar chat
+MODEL_NAME = "URajinda/ShweYon-V3-Base"
 
 # Load Dataset from GitHub
 DATASET_REPO = "amkyawdev/myanmar-llm-dataset"
