@@ -1,20 +1,35 @@
-import os
 import torch
 import gradio as gr
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from datasets import load_dataset
 
 # --- CONFIGURATION ---
-# Using ShweYon-V3-Base - Base model for Myanmar language
-MODEL_NAME = "URajinda/ShweYon-V3-Base"
+# Using Qwen2-0.5B-Instruct - Base model for Myanmar chat
+MODEL_NAME = "Qwen/Qwen2-0.5B-Instruct"
+
+# Load Dataset from GitHub
+DATASET_REPO = "amkyawdev/myanmar-llm-dataset"
+DATASET_PATH = "data/processed"
 
 # System Prompt - Instructions for the AI assistant
-# မြန်မာစာ အသုံးအနှုန်း မှန်ကန်အောင် ပြင်ဆင်ထားပါသည်
-SYSTEM_PROMPT = """သင်သည် မြန်မာဘာသာစကားကို ကျွမ်းကျင်စွာ ပြောဆိုနိုင်သော AI အကူအညီပေးသူ ဖြစ်သည်။
-- ယဉ်ကျေးပျူငှာစွာ ဖြေကြားပါ။
-- တိကျရှင်းလင်းစွာ ပြောဆိုပါ။
-- မြန်မာဘာသာစကားကိုသာ အသုံးပြုပါ။
-- အချက်အလက် အမှားမပါစေရန် ဂရုစိုက်ပါ။
-- သုံးစွဲသူကို အကောင်းဆုံး ကူညီပေးပါ။"""
+SYSTEM_PROMPT = """သင်သည် မြန်မာစကားပြောတဲ့ AI စာရေးပါ။ မြန်မာလို ပြောပါ။
+- ပါဝင်ပါတရား ဖြစ်ပါ။
+- ရှင်းလင်းပါ။
+- မြန်မာဘာသာစကားနဲ့ ပြောပါ။
+- အမှားမလုပ်ပါ။
+- သုံးစွဲသူကို ကူညီပါ။"""
+
+# Load dataset from GitHub
+print("📂 Loading Dataset from GitHub...")
+try:
+    dataset = load_dataset("json", data_files={
+        "train": f"https://raw.githubusercontent.com/{DATASET_REPO}/main/{DATASET_PATH}/train.jsonl",
+        "validation": f"https://raw.githubusercontent.com/{DATASET_REPO}/main/{DATASET_PATH}/validation.jsonl"
+    })
+    print(f"✅ Dataset loaded! Train: {len(dataset['train'])} samples")
+except Exception as e:
+    print(f"⚠️ Dataset load error: {e}")
+    dataset = None
 
 # --- MODEL LOADING ---
 print("🚀 Loading Model...")
@@ -38,35 +53,36 @@ except Exception as e:
     raise
 
 def chat_function(message, chat_history=None):
-    """
-    Chat function using ShweYon-V3-Base
-    """
+    """Chat function using Qwen2-0.5B"""
     if chat_history is None:
         chat_history = []
     
-    # Prompt Format ကို မြန်မာဆန်ဆန် ပြင်ထားပါသည်
-    context = f"<s>[INST] <<SYS>>\n{SYSTEM_PROMPT}\n<</SYS>>\n\n"
-
-    # Build conversation history - only keep last 2 turns to stay in context
-    recent_history = chat_history[-2:] if len(chat_history) > 2 else chat_history
-    for user_msg, bot_msg in recent_history:
-        context += f"အသုံးပြုသူ: {user_msg}\nAmkyaw AI: {bot_msg}\n"
+    # Qwen2 prompt format - simple and clean
+    context = "သင်သည် မြန်မာစကားပြောတဲ့ AI စာရေးပါ။ မြန်မာလို ပြောပါ။\n\n"
     
-    context += f"အသုံးပြုသူ: {message}\nAmkyaw AI: [/INST]"
-
+    # Build conversation history - only keep last 2 turns
+    recent_history = chat_history[-4:] if len(chat_history) > 4 else chat_history
+    for user_msg, bot_msg in recent_history:
+        context += f"သုံးစွဲသူ: {user_msg}\nAI: {bot_msg}\n"
+    
+    context += f"သုံးစွဲသူ: {message}\nAI: "
+    
     # Tokenize with truncation
     inputs = tokenizer(context, return_tensors="pt", truncation=True, max_length=512)
     input_ids_len = inputs.input_ids.shape[1]
     
-    # Generate parameters
+    # Generate with better parameters
     with torch.no_grad():
         outputs = model.generate(
             **inputs,
             max_new_tokens=128,
-            temperature=0.4, # ၀.၃ ထက် ၀.၄ က ပိုပြီး သဘာဝကျပါတယ်
-            top_p=0.8,
+            temperature=0.3,
+            top_p=0.7,
+            top_k=20,
             do_sample=True,
-            repetition_penalty=1.2, 
+            repetition_penalty=1.5,
+            length_penalty=1.2,
+            no_repeat_ngram_size=3,
             pad_token_id=tokenizer.pad_token_id,
             eos_token_id=tokenizer.eos_token_id
         )
@@ -75,12 +91,17 @@ def chat_function(message, chat_history=None):
     answer_tokens = outputs[0][input_ids_len:]
     decoded_output = tokenizer.decode(answer_tokens, skip_special_tokens=True)
     
-    # Cleaning up response logic
-    clean_answer = decoded_output.strip()
+    # Clean up response
+    lines = decoded_output.split('\n')
+    clean_answer = lines[0].strip() if lines else decoded_output.strip()
+    clean_answer = clean_answer.replace("AI:", "").replace("Assistant:", "").replace("သုံးစွဲသူ:", "").strip()
     
-    # Fallback response - အကယ်၍ AI က ဘာမှပြန်မဖြေရင် သုံးမည့်စာသား
+    # Ensure it's in Myanmar script
+    if clean_answer and not any('\u1000' <= c <= '\u109F' or '\uAA60' <= c <= '\uAA7F' for c in clean_answer[:10] if c):
+        clean_answer = "မေးခွန်းရိုက်ပါ။"
+    
     if not clean_answer or len(clean_answer) < 2:
-        clean_answer = "တောင်းပန်ပါတယ်၊ အဖြေထုတ်ပေးဖို့ အခက်အခဲရှိနေပါတယ်။"
+        clean_answer = "ပါးလွှတ်ပါပါ။"
     
     return clean_answer
 
