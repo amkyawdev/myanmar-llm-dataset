@@ -1,16 +1,6 @@
 #!/usr/bin/env python3
 """
-LoRA Fine-tuning Script for Qwen/Qwen2-0.5B-Instruct with Myanmar Chat Dataset
-
-⚠️ REQUIREMENTS:
-- GPU with at least 16GB VRAM
-- Python packages: torch, transformers, peft, trl, accelerate, datasets
-
-INSTALL:
-pip install torch transformers peft trl accelerate datasets
-
-RUN ON GOOGLE COLAB:
-https://colab.research.google.com/
+LoRA Fine-tuning Script for Qwen/Qwen2-0.5B-Instruct (Fixed Version)
 """
 
 import os
@@ -21,10 +11,8 @@ from datasets import load_dataset
 from trl import SFTTrainer
 
 # --- CONFIGURATION ---
-# Qwen2-0.5B - lightweight model for Myanmar chat
 MODEL_NAME = "Qwen/Qwen2-0.5B-Instruct"
 OUTPUT_DIR = "./lora_myanmar_chat"
-# Load dataset from local files (GitHub repo cloned)
 DATASET_PATH = "./data/processed"
 
 # LoRA Configuration
@@ -39,32 +27,29 @@ GRADIENT_ACCUMULATION = 4
 LEARNING_RATE = 2e-4
 NUM_EPOCHS = 3
 MAX_SEQ_LENGTH = 512
-WARMUP_RATIO = 0.1
+# warmup_ratio အစား warmup_steps ကို သုံးခြင်းက ပိုတည်ငြိမ်ပါတယ်
+WARMUP_STEPS = 10 
 
 print("🚀 Starting LoRA Fine-tuning for Qwen/Qwen2-0.5B-Instruct...")
-print(f"📁 Model: {MODEL_NAME}")
-print(f"📁 Dataset: {DATASET_PATH}")
 
 # Check GPU
 if not torch.cuda.is_available():
     print("❌ ERROR: No GPU detected!")
-    print("   Please run this on a GPU machine or Google Colab")
     exit(1)
 
 print(f"✅ GPU detected: {torch.cuda.get_device_name(0)}")
-print(f"   VRAM: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
 
 # --- LOAD MODEL AND TOKENIZER ---
 print("\n📥 Loading Model and Tokenizer...")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME, trust_remote_code=True)
 model = AutoModelForCausalLM.from_pretrained(
     MODEL_NAME,
-    torch_dtype=torch.float16,  # Use FP16 for better memory efficiency
+    # torch_dtype နေရာမှာ dtype လို့ ပြောင်းသုံးပါ (Warning မတက်အောင်)
+    dtype=torch.float16, 
     device_map="auto",
     trust_remote_code=True
 )
 
-# Set padding token
 if tokenizer.pad_token is None:
     tokenizer.pad_token = tokenizer.eos_token
 
@@ -72,15 +57,12 @@ print("✅ Model loaded successfully!")
 
 # --- LOAD DATASET ---
 print("\n📂 Loading Dataset from local files...")
+# local file တွေရှိမရှိ အရင်စစ်ဆေးပါ
 dataset = load_dataset("json", data_files={
     "train": f"{DATASET_PATH}/train.jsonl",
     "validation": f"{DATASET_PATH}/validation.jsonl",
     "test": f"{DATASET_PATH}/test.jsonl"
 })
-
-print(f"✅ Train samples: {len(dataset['train'])}")
-print(f"✅ Validation samples: {len(dataset['validation'])}")
-print(f"✅ Test samples: {len(dataset['test'])}")
 
 # --- CONFIGURE LORA ---
 print("\n⚙️ Configuring LoRA...")
@@ -91,14 +73,10 @@ lora_config = LoraConfig(
     target_modules=LORA_TARGET_MODULES,
     bias="none",
     task_type=TaskType.CAUSAL_LM,
-    inference_mode=False
 )
 
-# Apply LoRA to model
 model = get_peft_model(model, lora_config)
 model.print_trainable_parameters()
-
-print("✅ LoRA configured successfully!")
 
 # --- TRAINING ARGUMENTS ---
 print("\n🎯 Setting up Training Arguments...")
@@ -109,10 +87,10 @@ training_args = TrainingArguments(
     per_device_eval_batch_size=BATCH_SIZE,
     gradient_accumulation_steps=GRADIENT_ACCUMULATION,
     learning_rate=LEARNING_RATE,
-    warmup_ratio=WARMUP_RATIO,
+    warmup_steps=WARMUP_STEPS, # Ratio အစား Steps သုံးထားသည်
     logging_steps=10,
     save_steps=100,
-    eval_strategy="epoch",
+    evaluation_strategy="epoch", # eval_strategy အစား evaluation_strategy ကို သုံးနိုင်သည်
     save_strategy="epoch",
     load_best_model_at_end=True,
     metric_for_best_model="eval_loss",
@@ -123,10 +101,7 @@ training_args = TrainingArguments(
     remove_unused_columns=False,
 )
 
-# --- TRAINER ---
-print("\n🏋️ Starting Training...")
-
-# Format dataset for SFT - convert messages to text
+# --- FORMATTING DATASET ---
 def format_messages(example):
     """Convert messages format to text for SFT"""
     text = ""
@@ -134,22 +109,26 @@ def format_messages(example):
         role = msg["role"]
         content = msg["content"]
         if role == "system":
-            text += f"System: {content}\n"
+            text += f"<|im_start|>system\n{content}<|im_end|>\n"
         elif role == "user":
-            text += f"User: {content}\n"
+            text += f"<|im_start|>user\n{content}<|im_end|>\n"
         elif role == "assistant":
-            text += f"Assistant: {content}<|endoftext|>\n"
+            text += f"<|im_start|>assistant\n{content}<|im_end|>\n"
     return {"text": text}
 
-# Apply formatting
-dataset = dataset.map(format_messages, remove_columns=["messages"])
+dataset = dataset.map(format_messages)
+
+# --- TRAINER ---
+print("\n🏋️ Starting Training...")
 
 trainer = SFTTrainer(
     model=model,
     args=training_args,
     train_dataset=dataset["train"],
     eval_dataset=dataset["validation"],
+    # CRITICAL FIX: max_length အစား max_seq_length ကို သုံးပါ
     max_seq_length=MAX_SEQ_LENGTH,
+    dataset_text_field="text", # text column ကို အသုံးပြုရန် သတ်မှတ်ပေးရပါမည်
 )
 
 # Train
@@ -161,8 +140,3 @@ trainer.save_model(f"{OUTPUT_DIR}/final")
 tokenizer.save_pretrained(f"{OUTPUT_DIR}/final")
 
 print(f"\n✅ Training Complete!")
-print(f"📁 Model saved to: {OUTPUT_DIR}/final")
-print(f"\n📝 To use the fine-tuned model:")
-print(f"   from transformers import AutoModelForCausalLM, AutoTokenizer")
-print(f"   model = AutoModelForCausalLM.from_pretrained('{OUTPUT_DIR}/final')")
-print(f"   tokenizer = AutoTokenizer.from_pretrained('{OUTPUT_DIR}/final')")
