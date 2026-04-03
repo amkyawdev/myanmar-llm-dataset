@@ -21,8 +21,8 @@ from datasets import load_dataset
 from trl import SFTTrainer
 
 # --- CONFIGURATION ---
-# TinyLlama - lightweight model good for fine-tuning
-MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+# Mistral 7B - powerful chat model for Myanmar
+MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
 OUTPUT_DIR = "./lora_myanmar_chat"
 # Load dataset from local files (GitHub repo cloned)
 DATASET_PATH = "./data/processed"

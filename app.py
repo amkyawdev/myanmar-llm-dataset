@@ -4,8 +4,8 @@ import gradio as gr
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # --- CONFIGURATION ---
-# TinyLlama - lightweight model for Myanmar chat
-MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+# Mistral 7B - powerful chat model for Myanmar
+MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.2"
 DATASET_REPO = "amkyawdev/myanmar-llm-dataset"
 
 # System Prompt - Instructions for the AI assistant
