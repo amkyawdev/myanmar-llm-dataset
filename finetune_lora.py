@@ -41,7 +41,7 @@ NUM_EPOCHS = 3
 MAX_SEQ_LENGTH = 512
 WARMUP_RATIO = 0.1
 
-print("🚀 Starting LoRA Fine-tuning for ShweYon-V3-Base...")
+print("🚀 Starting LoRA Fine-tuning for Qwen/Qwen2-0.5B-Instruct...")
 print(f"📁 Model: {MODEL_NAME}")
 print(f"📁 Dataset: {DATASET_PATH}")
 
