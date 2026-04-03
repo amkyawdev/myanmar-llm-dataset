@@ -21,8 +21,9 @@ from datasets import load_dataset
 from trl import SFTTrainer
 
 # --- CONFIGURATION ---
-MODEL_NAME = "URajinda/ShweYon-V3-Base"
-OUTPUT_DIR = "./lora_shweyon_myanmar"
+# TinyLlama - lightweight model good for fine-tuning
+MODEL_NAME = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
+OUTPUT_DIR = "./lora_myanmar_chat"
 # Load dataset from local files (GitHub repo cloned)
 DATASET_PATH = "./data/processed"
 
